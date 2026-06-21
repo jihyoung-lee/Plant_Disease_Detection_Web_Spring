@@ -4,6 +4,7 @@ import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoRes
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,7 +17,7 @@ public class PestController {
         this.pestService = pestService;
     }
 
-    @GetMapping("/pest/search")
+    @GetMapping("/pest")
     public PestSearchResponse search(
             @RequestParam(required = false) String cropName,
             @RequestParam(required = false) String sickNameKor,
@@ -28,10 +29,9 @@ public class PestController {
                 page
         );
     }
-
-    @GetMapping("/pest/info")
+    @GetMapping("/pest/{sickKey}")
     public PestInfoResponse info(
-            @RequestParam(defaultValue = "D00001537") String sickKey
+            @PathVariable String sickKey
     ) {
         return pestService.info(sickKey);
     }
