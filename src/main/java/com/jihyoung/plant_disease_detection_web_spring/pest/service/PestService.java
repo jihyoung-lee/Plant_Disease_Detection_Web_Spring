@@ -48,7 +48,7 @@ public class PestService {
     public PestInfoResponse info(
             String sickKey
     ) {
-        String json = pestApiClient.info(sickKey);
+        String json = pestApiClient.getPestInfo(sickKey);
 
         PestInfoApiResponse apiResponse =
                 objectMapper.readValue(json, PestInfoApiResponse.class);

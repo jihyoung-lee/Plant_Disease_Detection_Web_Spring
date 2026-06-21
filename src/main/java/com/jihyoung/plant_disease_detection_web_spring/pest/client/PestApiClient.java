@@ -42,7 +42,7 @@ public class PestApiClient {
                 .block();
     }
 
-    public String info(
+    public String getPestInfo(
             String sickKey
     ) {
         return webClient.get()
