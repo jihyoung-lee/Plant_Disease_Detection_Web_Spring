@@ -41,4 +41,18 @@ public class PestApiClient {
                 .bodyToMono(String.class)
                 .block();
     }
+
+    public String info(
+            String sickKey
+    ) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .queryParam("apiKey", apiKey)
+                        .queryParam("serviceCode", "SVC05")
+                        .queryParam("sickKey", sickKey)
+                        .build())
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+    }
 }
