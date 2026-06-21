@@ -7,6 +7,7 @@ import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearc
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchApiResult;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchItem;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -21,6 +22,11 @@ public class PestService {
     public PestService(PestApiClient pestApiClient) {
         this.pestApiClient = pestApiClient;
     }
+
+    @Cacheable(
+            value = "pestSearch",
+            key = "#cropName + ':' + #sickNameKor + ':' + #page"
+    )
     public PestSearchResponse search(
             String cropName,
             String sickNameKor,
@@ -45,6 +51,7 @@ public class PestService {
         return new PestSearchResponse(totalCount, page, displayCount, totalPages, items);
     }
 
+    @Cacheable(value = "pestInfo", key = "#sickKey")
     public PestInfoResponse info(
             String sickKey
     ) {
