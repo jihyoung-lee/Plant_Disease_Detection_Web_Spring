@@ -1,14 +1,16 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.service;
 
 import com.jihyoung.plant_disease_detection_web_spring.pest.client.PestApiClient;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoApiResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchApiResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchApiResult;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchItem;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.PestItem;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.PestResponse;
 
 import java.util.List;
-import java.util.stream.StreamSupport;
 
 @Service
 public class PestService {
@@ -19,8 +21,7 @@ public class PestService {
     public PestService(PestApiClient pestApiClient) {
         this.pestApiClient = pestApiClient;
     }
-
-    public PestResponse search(
+    public PestSearchResponse search(
             String cropName,
             String sickNameKor,
             int page
@@ -30,24 +31,28 @@ public class PestService {
         int startPoint = (page - 1) * displayCount + 1;
 
         String json = pestApiClient.search(cropName, sickNameKor, startPoint, displayCount);
-        // jackson objectmapper 객체 생성
-        JsonNode root = objectMapper.readTree(json);
-        JsonNode service = root.get("service");
-        int totalCount = service.get("totalCount").asInt();
-        JsonNode list = service.get("list");
-        List<PestItem> items = StreamSupport.stream(
-                                list.spliterator(),
-                                false
-                        )
-                        .map(item -> new PestItem(
-                                item.get("cropName").asString(),
-                                item.get("thumbImg").asString(),
-                                item.get("sickNameKor").asString(),
-                                item.get("sickKey").asString()
-                        ))
-                        .toList();
 
+        PestSearchApiResponse apiResponse =
+                objectMapper.readValue(json, PestSearchApiResponse.class);
 
-        return new PestResponse(totalCount, items);
+        PestSearchApiResult service = apiResponse.service();
+
+        int totalCount = service.totalCount();
+        List<PestSearchItem> items = service.list();
+
+        int totalPages = (int) Math.ceil((double) totalCount / displayCount);
+
+        return new PestSearchResponse(totalCount, page, displayCount, totalPages, items);
+    }
+
+    public PestInfoResponse info(
+            String sickKey
+    ) {
+        String json = pestApiClient.info(sickKey);
+
+        PestInfoApiResponse apiResponse =
+                objectMapper.readValue(json, PestInfoApiResponse.class);
+
+        return apiResponse.service();
     }
 }
