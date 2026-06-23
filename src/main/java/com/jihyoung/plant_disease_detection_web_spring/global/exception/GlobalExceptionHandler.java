@@ -22,8 +22,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 "BAD_REQUEST",
-                e.getMessage(),
-                LocalDateTime.now()
+                e.getMessage()
         );
     }
 
@@ -33,8 +32,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.PAYLOAD_TOO_LARGE.value(),
                 "FILE_TOO_LARGE",
-                "업로드 가능한 파일 크기를 초과했습니다.",
-                LocalDateTime.now()
+                "업로드 가능한 파일 크기를 초과했습니다."
         );
     }
 
@@ -46,8 +44,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.BAD_GATEWAY.value(),
                 "EXTERNAL_API_ERROR",
-                "외부 API 호출 중 오류가 발생했습니다.",
-                LocalDateTime.now()
+                "외부 API 호출 중 오류가 발생했습니다."
         );
     }
 
@@ -57,8 +54,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.GATEWAY_TIMEOUT.value(),
                 "EXTERNAL_API_TIMEOUT",
-                "외부 API 응답 시간이 초과되었습니다.",
-                LocalDateTime.now()
+                "외부 API 응답 시간이 초과되었습니다."
         );
     }
 
@@ -70,8 +66,9 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "INTERNAL_SERVER_ERROR",
-                "서버 내부 오류가 발생했습니다.",
-                LocalDateTime.now()
+                "서버 내부 오류가 발생했습니다."
         );
+
     }
+
 }
