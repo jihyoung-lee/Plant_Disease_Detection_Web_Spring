@@ -41,25 +41,35 @@ public class PestService {
         PestSearchApiResponse apiResponse =
                 objectMapper.readValue(json, PestSearchApiResponse.class);
 
-        PestSearchApiResult service = apiResponse.service();
+        PestSearchApiResult service = apiResponse == null ? null : apiResponse.service();
+        if (service == null) {
+            throw new IllegalStateException("병해충 검색 API 응답 형식이 올바르지 않습니다.");
+        }
 
         int totalCount = service.totalCount();
-        List<PestSearchItem> items = service.list();
+        List<PestSearchItem> items = service.list() == null ? List.of() : service.list();
 
         int totalPages = (int) Math.ceil((double) totalCount / displayCount);
 
         return new PestSearchResponse(totalCount, page, displayCount, totalPages, items);
     }
 
-    @Cacheable(value = "pestInfo", key = "#sickKey")
+    @Cacheable(
+            value = "pestInfo",
+            key = "#sickKey",
+            condition = "#sickKey != null && !#sickKey.isBlank()"
+    )
     public PestInfoResponse info(
             String sickKey
     ) {
+        if (sickKey == null || sickKey.isBlank()) {
+            return null;
+        }
         String json = pestApiClient.getPestInfo(sickKey);
 
         PestInfoApiResponse apiResponse =
                 objectMapper.readValue(json, PestInfoApiResponse.class);
 
-        return apiResponse.service();
+        return apiResponse == null ? null : apiResponse.service();
     }
 }
