@@ -22,14 +22,10 @@ public class CacheConfig {
 
     @Bean
     // RedisConnectionFactory는 스프링이 자동으로 넣어주는 레디스와 연결하는 객체
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-
-        //ObjectMapper는 자바 객체를 JSON으로 바꾸고, JSON을 다시 자바 객체로 바꾸는 도구
-        ObjectMapper objectMapper = JsonMapper.builder()
-                //findAndAddModules() record, 날짜 타입 같은 걸 잘 처리할 수 있도록 필요한 모듈을 자동으로 찾아 붙이는 역할
-                .findAndAddModules()
-                .build();
-
+    public RedisCacheManager cacheManager(
+            RedisConnectionFactory connectionFactory,
+            ObjectMapper objectMapper
+    ) {
         //Redis에 저장할 때는 PestInfoResponse를 JSON으로 바꾸고, 꺼낼 때는 JSON을 다시 PestInfoResponse
         JacksonJsonRedisSerializer<PestInfoResponse> serializer =
                 new JacksonJsonRedisSerializer<>(
