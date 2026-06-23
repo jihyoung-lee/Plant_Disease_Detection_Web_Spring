@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+
 
 @Component
 public class AiApiClient
@@ -50,7 +52,8 @@ public class AiApiClient
                                 .map(body -> new RuntimeException("AI API 호출 실패: " + body))
                 )
                 .bodyToMono(AiPredictResponse.class)
-                .block();
+                //타임아웃
+                .block(Duration.ofSeconds(30));
 
     }
 }
