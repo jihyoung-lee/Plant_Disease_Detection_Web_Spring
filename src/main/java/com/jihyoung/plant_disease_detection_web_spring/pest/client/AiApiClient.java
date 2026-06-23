@@ -44,6 +44,11 @@ public class AiApiClient
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .bodyValue(builder.build())
                 .retrieve()
+                .onStatus(
+                        status -> status.is4xxClientError() || status.is5xxServerError(),
+                        response -> response.bodyToMono(String.class)
+                                .map(body -> new RuntimeException("AI API 호출 실패: " + body))
+                )
                 .bodyToMono(AiPredictResponse.class)
                 .block();
 
