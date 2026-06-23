@@ -40,6 +40,7 @@ public class AiApiClient
 
 
         return webClient.post()
+                .uri("/predict")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .bodyValue(builder.build())
                 .retrieve()
