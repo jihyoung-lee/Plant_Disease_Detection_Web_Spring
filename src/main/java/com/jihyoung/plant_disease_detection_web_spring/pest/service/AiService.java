@@ -30,17 +30,6 @@ public class AiService {
 
     private static final String UNDETERMINED_SICK_NAME = "판단보류";
 
-    /*
-     * AI 서버는 영문 작물 식별자를 사용하고, 병해충 API는 한글 작물명을 사용한다.
-     * 이 변환은 병해충 API를 조회할 때만 적용한다.
-     */
-    private static final Map<String, String> PEST_API_CROP_NAMES = Map.of(
-            "potato", "감자",
-            "apple", "사과",
-            "grape", "포도",
-            "peach", "복숭아",
-            "strawberry", "딸기"
-    );
 
     public AiService(AiApiClient aiApiClient, PestService pestService) {
         this.aiApiClient = aiApiClient;
@@ -124,14 +113,10 @@ public class AiService {
             return Optional.empty();
         }
 
-        String pestApiCropName = PEST_API_CROP_NAMES.getOrDefault(
-                cropName.trim().toLowerCase(Locale.ROOT),
-                cropName.trim()
-        );
         String normalizedSickName = sickNameKor.trim();
 
         PestSearchResponse searchResponse = pestService.search(
-                pestApiCropName,
+                cropName,
                 normalizedSickName,
                 1
         );
@@ -142,7 +127,7 @@ public class AiService {
 
         return searchResponse.items().stream()
                 .filter(Objects::nonNull)
-                .filter(item -> sameText(pestApiCropName, item.cropName()))
+                .filter(item -> sameText(cropName, item.cropName()))
                 .filter(item -> sameText(normalizedSickName, item.sickNameKor()))
                 .map(item -> item.sickKey())
                 .filter(AiService::hasText)

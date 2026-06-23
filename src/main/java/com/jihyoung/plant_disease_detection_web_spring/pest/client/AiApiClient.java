@@ -53,7 +53,7 @@ public class AiApiClient
                 )
                 .bodyToMono(AiPredictApiResponse.class)
                 //타임아웃
-                .block(Duration.ofSeconds(30));
+                .block(Duration.ofSeconds(15));
 
     }
 }
