@@ -1,6 +1,6 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.client;
 
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictApiResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -27,7 +27,7 @@ public class AiApiClient
                 .build();
     }
 
-    public AiPredictResponse predict(
+    public AiPredictApiResponse predict(
             String cropName,
             MultipartFile image
     ) {
@@ -51,7 +51,7 @@ public class AiApiClient
                         response -> response.bodyToMono(String.class)
                                 .map(body -> new RuntimeException("AI API 호출 실패: " + body))
                 )
-                .bodyToMono(AiPredictResponse.class)
+                .bodyToMono(AiPredictApiResponse.class)
                 //타임아웃
                 .block(Duration.ofSeconds(30));
 

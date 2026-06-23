@@ -2,7 +2,7 @@ package com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public record AiPredictResponse (
+public record AiPredictApiResponse(
 
         @JsonProperty("crop_name")
         String cropName,
