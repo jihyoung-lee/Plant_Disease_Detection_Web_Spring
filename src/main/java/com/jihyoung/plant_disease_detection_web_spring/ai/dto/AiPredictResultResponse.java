@@ -1,4 +1,4 @@
-package com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai;
+package com.jihyoung.plant_disease_detection_web_spring.ai.dto;
 
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
 

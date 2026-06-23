@@ -1,12 +1,13 @@
-package com.jihyoung.plant_disease_detection_web_spring.pest.service;
+package com.jihyoung.plant_disease_detection_web_spring.ai.service;
 
-import com.jihyoung.plant_disease_detection_web_spring.pest.client.AiApiClient;
+import com.jihyoung.plant_disease_detection_web_spring.ai.client.AiApiClient;
+import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictApiResponse;
+import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictResultResponse;
+import com.jihyoung.plant_disease_detection_web_spring.ai.dto.PredictionStatus;
 import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiServerException;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictApiResponse;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictResultResponse;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.PredictionStatus;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -158,4 +159,5 @@ public class AiService {
     private static boolean sameText(String expected, String actual) {
         return hasText(actual) && expected.equals(actual.trim());
     }
+
 }

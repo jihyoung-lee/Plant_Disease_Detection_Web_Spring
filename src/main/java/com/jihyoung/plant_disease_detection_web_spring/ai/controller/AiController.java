@@ -1,7 +1,7 @@
-package com.jihyoung.plant_disease_detection_web_spring.pest.controller;
+package com.jihyoung.plant_disease_detection_web_spring.ai.controller;
 
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictResultResponse;
-import com.jihyoung.plant_disease_detection_web_spring.pest.service.AiService;
+import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictResultResponse;
+import com.jihyoung.plant_disease_detection_web_spring.ai.service.AiService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;

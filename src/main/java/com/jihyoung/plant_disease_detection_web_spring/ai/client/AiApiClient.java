@@ -1,8 +1,8 @@
-package com.jihyoung.plant_disease_detection_web_spring.pest.client;
+package com.jihyoung.plant_disease_detection_web_spring.ai.client;
 
 import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiServerException;
 import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiTimeoutException;
-import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictApiResponse;
+import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictApiResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
