@@ -28,6 +28,15 @@ public class AiService {
             "strawberry"
     );
 
+    private static final Map<String, String> PEST_API_CROP_NAMES = Map.of(
+            "potato", "감자",
+            "tomato", "토마토",
+            "apple", "사과",
+            "grape", "포도",
+            "peach", "복숭아",
+            "strawberry", "딸기"
+    );
+
     private static final String UNDETERMINED_SICK_NAME = "판단보류";
 
 
@@ -125,9 +134,14 @@ public class AiService {
             return Optional.empty();
         }
 
+        String pestApiCropName = PEST_API_CROP_NAMES.getOrDefault(
+                cropName.trim().toLowerCase(Locale.ROOT),
+                cropName.trim()
+        );
+
         return searchResponse.items().stream()
                 .filter(Objects::nonNull)
-                .filter(item -> sameText(cropName, item.cropName()))
+                .filter(item -> sameText(pestApiCropName, item.cropName()))
                 .filter(item -> sameText(normalizedSickName, item.sickNameKor()))
                 .map(item -> item.sickKey())
                 .filter(AiService::hasText)
