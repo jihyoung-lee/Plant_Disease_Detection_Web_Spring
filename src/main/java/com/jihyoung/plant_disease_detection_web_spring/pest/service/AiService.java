@@ -124,8 +124,14 @@ public class AiService {
 
         String normalizedSickName = sickNameKor.trim();
 
+        // 영어로 된 작물명 한글로 변환
+        String pestApiCropName = PEST_API_CROP_NAMES.getOrDefault(
+                cropName.trim().toLowerCase(Locale.ROOT),
+                cropName.trim()
+        );
+
         PestSearchResponse searchResponse = pestService.search(
-                cropName,
+                pestApiCropName,
                 normalizedSickName,
                 1
         );
@@ -134,10 +140,7 @@ public class AiService {
             return Optional.empty();
         }
 
-        String pestApiCropName = PEST_API_CROP_NAMES.getOrDefault(
-                cropName.trim().toLowerCase(Locale.ROOT),
-                cropName.trim()
-        );
+
 
         return searchResponse.items().stream()
                 .filter(Objects::nonNull)
