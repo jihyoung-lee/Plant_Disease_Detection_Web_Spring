@@ -1,6 +1,7 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.service;
 
 import com.jihyoung.plant_disease_detection_web_spring.pest.client.PestApiClient;
+import com.jihyoung.plant_disease_detection_web_spring.global.exception.PestApiException;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoApiResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchApiResponse;
@@ -48,12 +49,15 @@ public class PestService {
 
         String json = pestApiClient.search(cropName, sickNameKor, startPoint, displayCount);
 
-        PestSearchApiResponse apiResponse =
-                objectMapper.readValue(json, PestSearchApiResponse.class);
+        PestSearchApiResponse apiResponse = parse(
+                json,
+                PestSearchApiResponse.class,
+                "병해충 검색 API 응답을 해석하지 못했습니다."
+        );
 
         PestSearchApiResult service = apiResponse == null ? null : apiResponse.service();
         if (service == null) {
-            throw new IllegalStateException("병해충 검색 API 응답 형식이 올바르지 않습니다.");
+            throw new PestApiException("병해충 검색 API 응답 형식이 올바르지 않습니다.");
         }
 
         int totalCount = service.totalCount();
@@ -93,10 +97,25 @@ public class PestService {
         }
         String json = pestApiClient.getPestInfo(sickKey);
 
-        PestInfoApiResponse apiResponse =
-                objectMapper.readValue(json, PestInfoApiResponse.class);
+        PestInfoApiResponse apiResponse = parse(
+                json,
+                PestInfoApiResponse.class,
+                "병해충 상세 정보 API 응답을 해석하지 못했습니다."
+        );
 
-        return apiResponse == null ? null : apiResponse.service();
+        if (apiResponse == null || apiResponse.service() == null) {
+            throw new PestApiException("병해충 상세 정보 API 응답 형식이 올바르지 않습니다.");
+        }
+
+        return apiResponse.service();
+    }
+
+    private <T> T parse(String json, Class<T> responseType, String errorMessage) {
+        try {
+            return objectMapper.readValue(json, responseType);
+        } catch (RuntimeException e) {
+            throw new PestApiException(errorMessage, e);
+        }
     }
 
 }

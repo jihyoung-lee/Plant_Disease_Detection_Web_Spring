@@ -1,6 +1,7 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.service;
 
 import com.jihyoung.plant_disease_detection_web_spring.pest.client.AiApiClient;
+import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiServerException;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictApiResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictResultResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.PredictionStatus;
@@ -52,7 +53,7 @@ public class AiService {
 
         AiPredictApiResponse response = aiApiClient.predict(cropName, image);
         if (response == null || !hasText(response.cropName()) || !hasText(response.sickNameKor())) {
-            throw new IllegalStateException("AI 서버가 유효한 예측 결과를 반환하지 않았습니다.");
+            throw new AiServerException("AI 서버가 유효한 예측 결과를 반환하지 않았습니다.");
         }
 
         // 판단보류는 병해충 API에 존재하는 질병명이 아니므로 조회하지 않는다.
