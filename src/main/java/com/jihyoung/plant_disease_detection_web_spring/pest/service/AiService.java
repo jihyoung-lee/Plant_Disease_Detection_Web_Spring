@@ -30,7 +30,6 @@ public class AiService {
 
     private static final Map<String, String> PEST_API_CROP_NAMES = Map.of(
             "potato", "감자",
-            "tomato", "토마토",
             "apple", "사과",
             "grape", "포도",
             "peach", "복숭아",
