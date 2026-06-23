@@ -1,8 +1,12 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.client;
 
+import com.jihyoung.plant_disease_detection_web_spring.global.exception.PestApiException;
+import com.jihyoung.plant_disease_detection_web_spring.global.exception.PestApiTimeoutException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Duration;
 
@@ -29,19 +33,26 @@ public class PestApiClient {
             int displayCount
     ) {
 
-        return webClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .queryParam("apiKey", apiKey)
-                        .queryParam("serviceCode", "SVC01")
-                        .queryParam("serviceType", "AA003")
-                        .queryParam("cropName", cropName)
-                        .queryParam("sickNameKor", sickNameKor)
-                        .queryParam("displayCount", displayCount)
-                        .queryParam("startPoint", startPoint)
-                        .build())
-                .retrieve()
-                .bodyToMono(String.class)
-                .block(Duration.ofSeconds(5));
+        try {
+            return webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .queryParam("apiKey", apiKey)
+                            .queryParam("serviceCode", "SVC01")
+                            .queryParam("serviceType", "AA003")
+                            .queryParam("cropName", cropName)
+                            .queryParam("sickNameKor", sickNameKor)
+                            .queryParam("displayCount", displayCount)
+                            .queryParam("startPoint", startPoint)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(Duration.ofSeconds(5));
+        } catch (WebClientResponseException e){
+            throw new PestApiException();
+        } catch (WebClientRequestException | IllegalStateException e) {
+            throw new PestApiTimeoutException();
+        }
+
     }
 
     public String getPestInfo(
