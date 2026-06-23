@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.time.LocalDateTime;
 import java.util.concurrent.TimeoutException;
 
 @RestControllerAdvice
@@ -70,5 +69,23 @@ public class GlobalExceptionHandler {
         );
 
     }
+    @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
+    @ExceptionHandler(AiTimeoutException.class)
+    public ErrorResponse handleAiTimeout(){
+        return new ErrorResponse(
+                504,
+                "AI_TIMEOUT",
+                "AI 서버 응답 시간이 초과되었습니다."
+        );
+    }
 
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    @ExceptionHandler(AiServerException.class)
+    public ErrorResponse handleAiServer(){
+        return new ErrorResponse(
+                502,
+                "AI_SERVER_ERROR",
+                "AI 서버 호출에 실패했습니다."
+        );
+    }
 }
