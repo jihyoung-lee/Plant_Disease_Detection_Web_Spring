@@ -13,14 +13,19 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Service
 public class PestService {
 
     private final PestApiClient pestApiClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public PestService(PestApiClient pestApiClient) {
+    public PestService(
+            PestApiClient pestApiClient,
+            ObjectMapper objectMapper) {
         this.pestApiClient = pestApiClient;
+        this.objectMapper = objectMapper;
     }
 
     @Cacheable(
@@ -32,6 +37,11 @@ public class PestService {
             String sickNameKor,
             int page
     ) {
+
+        validateSearch(
+                cropName,
+                sickNameKor,
+                page);
 
         int displayCount = 5;
         int startPoint = (page - 1) * displayCount + 1;
@@ -53,7 +63,23 @@ public class PestService {
 
         return new PestSearchResponse(totalCount, page, displayCount, totalPages, items);
     }
+    private void validateSearch(
+            String cropName,
+            String sickNameKor,
+            int page
+    ) {
+        if (!hasText(cropName) && !hasText(sickNameKor)) {
+            throw new IllegalArgumentException(
+                    "작물명 또는 병명 중 하나는 입력해야 합니다."
+            );
+        }
 
+        if (page < 1) {
+            throw new IllegalArgumentException(
+                    "page는 1 이상이어야 합니다."
+            );
+        }
+    }
     @Cacheable(
             value = "pestInfo",
             key = "#sickKey",
@@ -72,4 +98,5 @@ public class PestService {
 
         return apiResponse == null ? null : apiResponse.service();
     }
+
 }
