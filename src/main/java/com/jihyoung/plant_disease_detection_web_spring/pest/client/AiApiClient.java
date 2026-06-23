@@ -1,6 +1,9 @@
 package com.jihyoung.plant_disease_detection_web_spring.pest.client;
 
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.ai.AiPredictResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -22,17 +25,25 @@ public class AiApiClient
                 .build();
     }
 
-    public String predict(
+    public AiPredictResponse predict(
             String cropName,
-            MultipartFile file
+            MultipartFile image
     ) {
+        MultipartBodyBuilder builder =
+                new MultipartBodyBuilder();
+
+        builder.part("crop_name", cropName);
+        builder.part(
+                "image",
+                image.getResource()
+        );
+
+
         return webClient.post()
-                .uri(uriBuilder -> uriBuilder
-                        .queryParam("crop_name", cropName)
-                        .queryParam("UploadFile",file)
-                        .build())
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(builder.build())
                 .retrieve()
-                .bodyToMono(String.class)
+                .bodyToMono(AiPredictResponse.class)
                 .block();
 
     }
