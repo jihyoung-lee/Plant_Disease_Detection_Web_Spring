@@ -4,6 +4,8 @@ import com.jihyoung.plant_disease_detection_web_spring.ai.client.AiApiClient;
 import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictApiResponse;
 import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictResultResponse;
 import com.jihyoung.plant_disease_detection_web_spring.ai.dto.PredictionStatus;
+import com.jihyoung.plant_disease_detection_web_spring.ai.entity.AiResult;
+import com.jihyoung.plant_disease_detection_web_spring.ai.repository.AiResultRepository;
 import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiServerException;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
@@ -11,6 +13,7 @@ import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +56,9 @@ public class AiService {
         validate(cropName, image);
 
         AiPredictApiResponse response = aiApiClient.predict(cropName, image);
+
+        String ImageHash = generateHash(image);
+
         if (response == null || !hasText(response.cropName()) || !hasText(response.sickNameKor())) {
             throw new AiServerException("AI 서버가 유효한 예측 결과를 반환하지 않았습니다.");
         }
@@ -152,6 +158,24 @@ public class AiService {
                 .findFirst();
     }
 
+    public String generateHash(MultipartFile file) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+
+            byte[] hashBytes = md.digest(file.getBytes());
+
+            StringBuilder sb = new StringBuilder();
+
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+
+            return sb.toString();
+
+        } catch (Exception e) {
+            throw new RuntimeException("해시 생성 실패");
+        }
+    }
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
