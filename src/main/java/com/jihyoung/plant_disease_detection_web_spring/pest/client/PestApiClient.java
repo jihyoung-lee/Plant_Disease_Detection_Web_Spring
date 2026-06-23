@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+
 @Component
 public class PestApiClient {
 
@@ -39,7 +41,7 @@ public class PestApiClient {
                         .build())
                 .retrieve()
                 .bodyToMono(String.class)
-                .block();
+                .block(Duration.ofSeconds(5));
     }
 
     public String getPestInfo(
@@ -53,6 +55,6 @@ public class PestApiClient {
                         .build())
                 .retrieve()
                 .bodyToMono(String.class)
-                .block();
+                .block(Duration.ofSeconds(5));
     }
 }
