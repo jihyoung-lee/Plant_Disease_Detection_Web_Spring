@@ -15,13 +15,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class AiService {
-    private final AiApiClient aiApiClient;
-    private final PestService pestService;
-    private final AiResultRepository aiResultRepository;
 
     private static final Set<String> SUPPORTED_CROPS = Set.of(
             "potato",
@@ -41,77 +42,134 @@ public class AiService {
 
     private static final String UNDETERMINED_SICK_NAME = "판단보류";
 
+    private final AiApiClient aiApiClient;
+    private final PestService pestService;
+    private final AiResultRepository aiResultRepository;
 
-    public AiService(AiApiClient aiApiClient, PestService pestService, AiResultRepository aiResultRepository) {
+    public AiService(
+            AiApiClient aiApiClient,
+            PestService pestService,
+            AiResultRepository aiResultRepository
+    ) {
         this.aiApiClient = aiApiClient;
         this.pestService = pestService;
         this.aiResultRepository = aiResultRepository;
     }
 
-    public AiPredictResultResponse predict(
-            String cropName,
-            MultipartFile image
+    public AiPredictResultResponse predict(String requestedCropName, MultipartFile image) {
+        validate(requestedCropName, image);
+
+        String imageHash = generateHash(image);
+        Optional<AiResult> cachedResult = aiResultRepository
+                .findByImageHashAndRequestedCropName(imageHash, requestedCropName);
+
+        if (cachedResult.isPresent()) {
+            return buildCachedResponse(cachedResult.get());
+        }
+
+        return predictAndStore(requestedCropName, image, imageHash);
+    }
+
+    private AiPredictResultResponse predictAndStore(
+            String requestedCropName,
+            MultipartFile image,
+            String imageHash
     ) {
-        validate(cropName, image);
-
-        AiPredictApiResponse response = aiApiClient.predict(cropName, image);
-
-
-
+        AiPredictApiResponse response = aiApiClient.predict(requestedCropName, image);
         if (response == null || !hasText(response.cropName()) || !hasText(response.sickNameKor())) {
             throw new AiServerException("AI 서버가 유효한 예측 결과를 반환하지 않았습니다.");
         }
 
-        // 판단보류는 병해충 API에 존재하는 질병명이 아니므로 조회하지 않는다.
         if (UNDETERMINED_SICK_NAME.equals(response.sickNameKor())) {
-            return new AiPredictResultResponse(
+            AiResult result = saveAiResult(
+                    imageHash,
+                    image.getOriginalFilename(),
+                    requestedCropName,
+                    response,
                     PredictionStatus.UNDETERMINED,
-                    response.cropName(),
-                    response.sickNameKor(),
-                    response.confidence(),
-                    "사진을 다시 촬영하거나 다른 잎 사진을 올려 주세요.",
                     null
             );
+            return toResponse(result, null, "판단이 어려운 이미지입니다. 다른 사진을 올려 주세요.");
         }
 
         Optional<String> sickKey = getSickKey(response.cropName(), response.sickNameKor());
         if (sickKey.isEmpty()) {
-            return new AiPredictResultResponse(
+            AiResult result = saveAiResult(
+                    imageHash,
+                    image.getOriginalFilename(),
+                    requestedCropName,
+                    response,
                     PredictionStatus.INFO_NOT_FOUND,
-                    response.cropName(),
-                    response.sickNameKor(),
-                    response.confidence(),
-                    "예측 결과에 맞는 병해충 상세 정보를 찾지 못했습니다.",
                     null
             );
+            return toResponse(result, null, "예측 결과에 맞는 병해충 상세 정보를 찾지 못했습니다.");
         }
 
-        PestInfoResponse pestInfoResponse = pestService.info(sickKey.get());
-        if (pestInfoResponse == null) {
-            return new AiPredictResultResponse(
-                    PredictionStatus.INFO_NOT_FOUND,
-                    response.cropName(),
-                    response.sickNameKor(),
-                    response.confidence(),
-                    "병해충 상세 정보를 불러오지 못했습니다.",
-                    null
-            );
-        }
-
-        String imageHash = generateHash(image);
-        String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
-        String imageUrl = "/uploads/" + fileName;
-
-        saveAiResult(imageUrl, imageHash, image.getOriginalFilename(), cropName, response.sickNameKor(), response.confidence());
-
-        return new AiPredictResultResponse(
+        AiResult result = saveAiResult(
+                imageHash,
+                image.getOriginalFilename(),
+                requestedCropName,
+                response,
                 PredictionStatus.SUCCESS,
+                sickKey.get()
+        );
+
+        PestInfoResponse pestInfo = pestService.info(sickKey.get());
+        return toResponse(result, pestInfo, "예측에 성공했습니다.");
+    }
+
+    private AiPredictResultResponse buildCachedResponse(AiResult result) {
+        if (result.getStatus() != PredictionStatus.SUCCESS || !hasText(result.getSickKey())) {
+            return toResponse(result, null, messageFor(result.getStatus()));
+        }
+
+        PestInfoResponse pestInfo = pestService.info(result.getSickKey());
+        return toResponse(result, pestInfo, "저장된 예측 결과를 사용했습니다.");
+    }
+
+    private AiResult saveAiResult(
+            String imageHash,
+            String originalFileName,
+            String requestedCropName,
+            AiPredictApiResponse response,
+            PredictionStatus status,
+            String sickKey
+    ) {
+        AiResult result = new AiResult(
+                null,
+                imageHash,
+                originalFileName,
+                requestedCropName,
                 response.cropName(),
                 response.sickNameKor(),
+                sickKey,
                 response.confidence(),
-                "예측에 성공했습니다.",
-                pestInfoResponse
+                status
         );
+        return aiResultRepository.save(result);
+    }
+
+    private AiPredictResultResponse toResponse(
+            AiResult result,
+            PestInfoResponse pestInfo,
+            String message
+    ) {
+        return new AiPredictResultResponse(
+                result.getStatus(),
+                result.getCropName(),
+                result.getSickNameKor(),
+                result.getConfidence(),
+                message,
+                pestInfo
+        );
+    }
+
+    private String messageFor(PredictionStatus status) {
+        return switch (status) {
+            case UNDETERMINED -> "판단이 어려운 이미지입니다. 다른 사진을 올려 주세요.";
+            case INFO_NOT_FOUND -> "예측 결과에 맞는 병해충 상세 정보를 찾지 못했습니다.";
+            case SUCCESS -> "저장된 예측 결과를 사용했습니다.";
+        };
     }
 
     private void validate(String cropName, MultipartFile image) {
@@ -134,13 +192,11 @@ public class AiService {
             return Optional.empty();
         }
 
-        String normalizedSickName = sickNameKor.trim();
-
-        // 영어로 된 작물명 한글로 변환
         String pestApiCropName = PEST_API_CROP_NAMES.getOrDefault(
                 cropName.trim().toLowerCase(Locale.ROOT),
                 cropName.trim()
         );
+        String normalizedSickName = sickNameKor.trim();
 
         PestSearchResponse searchResponse = pestService.search(
                 pestApiCropName,
@@ -151,7 +207,6 @@ public class AiService {
         if (searchResponse == null || searchResponse.items() == null) {
             return Optional.empty();
         }
-
 
         return searchResponse.items().stream()
                 .filter(Objects::nonNull)
@@ -164,39 +219,18 @@ public class AiService {
 
     private String generateHash(MultipartFile file) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = messageDigest.digest(file.getBytes());
+            StringBuilder hash = new StringBuilder();
 
-            byte[] hashBytes = md.digest(file.getBytes());
-
-            StringBuilder sb = new StringBuilder();
-
-            for (byte b : hashBytes) {
-                sb.append(String.format("%02x", b));
+            for (byte hashByte : hashBytes) {
+                hash.append(String.format("%02x", hashByte));
             }
 
-            return sb.toString();
-
+            return hash.toString();
         } catch (Exception e) {
-            throw new RuntimeException("해시 생성 실패");
+            throw new IllegalStateException("이미지 해시를 생성하지 못했습니다.", e);
         }
-    }
-
-    private void saveAiResult(String imageUrl,
-                              String imageHash,
-                              String originalFileName,
-                              String cropName,
-                              String sickNameKor,
-                              BigDecimal confidence) {
-        AiResult result = new AiResult(
-                 imageUrl,
-                 imageHash,
-                 originalFileName,
-                 cropName,
-                 sickNameKor,
-                 confidence
-        );
-
-        aiResultRepository.save(result);
     }
 
     private static boolean hasText(String value) {
@@ -206,5 +240,4 @@ public class AiService {
     private static boolean sameText(String expected, String actual) {
         return hasText(actual) && expected.equals(actual.trim());
     }
-
 }

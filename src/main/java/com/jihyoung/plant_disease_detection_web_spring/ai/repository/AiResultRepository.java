@@ -8,5 +8,5 @@ import java.util.Optional;
 public interface AiResultRepository
         extends JpaRepository<AiResult, Long> {
 
-    Optional<AiResult> findByImageHash(String imageHash);
+    Optional<AiResult> findByImageHashAndRequestedCropName(String imageHash, String requestedCropName);
 }
