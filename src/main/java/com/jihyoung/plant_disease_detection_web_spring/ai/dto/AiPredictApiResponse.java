@@ -2,6 +2,8 @@ package com.jihyoung.plant_disease_detection_web_spring.ai.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.math.BigDecimal;
+
 public record AiPredictApiResponse(
 
         @JsonProperty("crop_name")
@@ -10,7 +12,7 @@ public record AiPredictApiResponse(
         @JsonProperty("sick_name_kor")
         String sickNameKor,
 
-        double confidence
+        BigDecimal confidence
 ) {
 
 }
