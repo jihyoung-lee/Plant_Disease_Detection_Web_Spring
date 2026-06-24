@@ -13,17 +13,15 @@ import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.security.MessageDigest;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class AiService {
     private final AiApiClient aiApiClient;
     private final PestService pestService;
+    private final AiResultRepository aiResultRepository;
 
     private static final Set<String> SUPPORTED_CROPS = Set.of(
             "potato",
@@ -44,9 +42,10 @@ public class AiService {
     private static final String UNDETERMINED_SICK_NAME = "판단보류";
 
 
-    public AiService(AiApiClient aiApiClient, PestService pestService) {
+    public AiService(AiApiClient aiApiClient, PestService pestService, AiResultRepository aiResultRepository) {
         this.aiApiClient = aiApiClient;
         this.pestService = pestService;
+        this.aiResultRepository = aiResultRepository;
     }
 
     public AiPredictResultResponse predict(
@@ -57,7 +56,7 @@ public class AiService {
 
         AiPredictApiResponse response = aiApiClient.predict(cropName, image);
 
-        String ImageHash = generateHash(image);
+
 
         if (response == null || !hasText(response.cropName()) || !hasText(response.sickNameKor())) {
             throw new AiServerException("AI 서버가 유효한 예측 결과를 반환하지 않았습니다.");
@@ -98,6 +97,12 @@ public class AiService {
                     null
             );
         }
+
+        String imageHash = generateHash(image);
+        String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
+        String imageUrl = "/uploads/" + fileName;
+
+        saveAiResult(imageUrl, imageHash, image.getOriginalFilename(), cropName, response.sickNameKor(), response.confidence());
 
         return new AiPredictResultResponse(
                 PredictionStatus.SUCCESS,
@@ -148,7 +153,6 @@ public class AiService {
         }
 
 
-
         return searchResponse.items().stream()
                 .filter(Objects::nonNull)
                 .filter(item -> sameText(pestApiCropName, item.cropName()))
@@ -158,7 +162,7 @@ public class AiService {
                 .findFirst();
     }
 
-    public String generateHash(MultipartFile file) {
+    private String generateHash(MultipartFile file) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
 
@@ -176,6 +180,25 @@ public class AiService {
             throw new RuntimeException("해시 생성 실패");
         }
     }
+
+    private void saveAiResult(String imageUrl,
+                              String imageHash,
+                              String originalFileName,
+                              String cropName,
+                              String sickNameKor,
+                              BigDecimal confidence) {
+        AiResult result = new AiResult(
+                 imageUrl,
+                 imageHash,
+                 originalFileName,
+                 cropName,
+                 sickNameKor,
+                 confidence
+        );
+
+        aiResultRepository.save(result);
+    }
+
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
