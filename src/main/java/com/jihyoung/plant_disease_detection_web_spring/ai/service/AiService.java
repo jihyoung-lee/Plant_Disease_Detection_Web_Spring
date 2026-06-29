@@ -13,7 +13,6 @@ import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.Map;
