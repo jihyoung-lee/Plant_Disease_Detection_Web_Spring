@@ -1,120 +1,137 @@
-# 🌿 Plant Disease Detection API
+# Plant Disease Detection API
 
-작물 병해충 정보를 검색하고, 이미지 기반 AI 예측 결과를 병해충 상세 정보와 연결하는 Spring Boot 백엔드입니다.
+![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?logo=springboot&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?logo=mysql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?logo=redis&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-Wrapper-02303A?logo=gradle&logoColor=white)
 
-> 예측은 AI 서버가 담당하고, 병명·증상·예방 및 방제 정보는 농촌진흥청 국가농작물병해충관리시스템 API를 기반으로 제공합니다.
+작물 병해 이미지를 AI 서버에 전달해 질병을 예측하고, 예측 결과를 농촌진흥청 병해충 정보와 연결해 제공하는 Spring Boot 백엔드입니다.
+
+AI 예측 결과는 MySQL에 저장하여 같은 이미지와 작물 조합의 중복 요청을 줄이고, 병해충 검색 및 상세 조회 결과는 Redis에 캐시합니다.
 
 ## 주요 기능
 
 | 기능 | 설명 |
 | --- | --- |
-| 병해충 검색 | 작물명 또는 병해충명으로 검색하고, 5개 단위로 페이지를 반환합니다. |
-| 병해충 상세 조회 | 증상, 발생 조건, 예방·방제 방법 및 관련 이미지를 제공합니다. |
-| AI 이미지 예측 | 지원 작물과 병해 이미지를 받아 AI 서버에 예측을 요청합니다. |
-| 상세 정보 자동 연결 | 예측 병명을 병해충 API에서 찾아, 가능한 경우 상세 정보를 함께 반환합니다. |
-| Redis 캐시 | 검색 결과는 30분, 상세 정보는 1시간 동안 캐시합니다. |
-| 예외 응답 표준화 | 입력 오류, 파일 용량 초과, 외부 API 오류·타임아웃을 일관된 형식으로 반환합니다. |
+| 병해충 검색 | 작물명 또는 병명으로 검색하며, 한 페이지에 5개씩 반환합니다. |
+| 병해충 상세 조회 | 감염 경로, 발생 조건, 증상, 예방·방제 방법과 관련 이미지를 제공합니다. |
+| AI 이미지 예측 | 작물 종류와 잎 이미지를 AI 서버로 전송해 질병명과 신뢰도를 반환합니다. |
+| 상세 정보 연결 | AI가 예측한 병명을 병해충 API에서 검색해 상세 정보를 결합합니다. |
+| 예측 결과 재사용 | 이미지 SHA-256 해시와 요청 작물을 기준으로 기존 MySQL 결과를 재사용합니다. |
+| 응답 캐시 | 검색 결과는 30분, 상세 정보는 1시간 동안 Redis에 캐시합니다. |
+| 공통 예외 처리 | 입력 오류, 파일 용량 초과, 외부 API 오류와 타임아웃을 동일한 형식으로 반환합니다. |
+
+## 요청 처리 흐름
+
+```mermaid
+flowchart LR
+    Client["Client"] -->|"GET /pest/**"| Pest["Pest service"]
+    Pest <-->|"검색·상세 캐시"| Redis[(Redis)]
+    Pest -->|"Cache miss"| PestAPI["농촌진흥청 병해충 API"]
+
+    Client -->|"POST /predict"| Predict["AI service"]
+    Predict <-->|"예측 조회·저장"| DB[(MySQL)]
+    Predict -->|"저장된 결과 없음"| AI["AI prediction server"]
+    Predict -->|"예측 병명 조회"| Pest
+```
+
+`POST /predict` 요청은 업로드 이미지의 해시를 먼저 계산합니다. 동일한 이미지와 작물로 저장된 결과가 있으면 AI 서버를 다시 호출하지 않습니다.
 
 ## 기술 스택
 
 - Java 21
-- Spring Boot 4.1
-- Spring Web MVC / WebFlux (`WebClient`)
-- Spring Validation
-- Spring Cache + Redis
-- Gradle
+- Spring Boot 4.1.0
+- Spring Web MVC, WebFlux `WebClient`
+- Spring Data JPA, MySQL
+- Flyway
+- Spring Cache, Redis
+- Bean Validation
+- Gradle Wrapper
 
-## 동작 구조
-
-```text
-클라이언트
-  │
-  ├── GET /pest ────────────────┐
-  ├── GET /pest/{sickKey}       ├── 농촌진흥청 병해충 API
-  │                             └── Redis 캐시
-  │
-  └── POST /predict
-         │
-         ├── AI 예측 서버 (/predict)
-         └── 예측 병명으로 병해충 API 조회 → 상세 정보 결합
-```
-
-## 사전 요구 사항
+## 실행 전 준비
 
 - JDK 21
-- Redis 7 이상 (`localhost:6379` 기본값)
+- MySQL
+- Redis
 - 농촌진흥청 병해충 API 인증 키
-- 이미지 예측 AI 서버 
+- `POST /predict`를 제공하는 AI 예측 서버
 
-AI 서버는 아래 `multipart/form-data` 요청을 처리해야 합니다.
+기본 연결 정보는 다음과 같습니다.
 
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `crop_name` | String | 영문 작물 식별자 |
-| `image` | File | 병해 이미지 |
-
+| 대상 | 기본값 |
+| --- | --- |
+| 애플리케이션 | `http://localhost:8080` |
+| AI 서버 | `http://localhost:5000` |
+| MySQL | `localhost:3306/plant_disease` |
+| Redis | `localhost:6379` |
 
 ## 환경 설정
 
-기본 설정은 [`application.properties`](src/main/resources/application.properties)에 있습니다.
+설정 원본은 [`src/main/resources/application.properties`](src/main/resources/application.properties)에 있습니다.
 
-```properties
-pest.api.key=${PEST_API_KEY}
-pest.api.url=http://ncpms.rda.go.kr/npmsAPI/service
+| 환경 변수 | 필수 | 기본값 | 설명 |
+| --- | :---: | --- | --- |
+| `PEST_API_KEY` | O | - | 농촌진흥청 병해충 API 인증 키 |
+| `MYSQL_PASSWORD` | O | - | MySQL 비밀번호 |
+| `MYSQL_URL` | X | `jdbc:mysql://localhost:3306/plant_disease?...` | JDBC 연결 URL |
+| `MYSQL_USERNAME` | X | `plant_app` | MySQL 사용자 이름 |
+| `AI_API_URL` | X | `http://localhost:5000` | AI 서버 기본 URL |
+| `SPRING_DATA_REDIS_HOST` | X | `localhost` | Redis 호스트 |
+| `SPRING_DATA_REDIS_PORT` | X | `6379` | Redis 포트 |
 
-ai.api.url=http://test.com/predictionAPI
-
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-
-spring.servlet.multipart.max-file-size=20MB
-spring.servlet.multipart.max-request-size=20MB
-```
-
-### 환경 변수 설정
-
-PowerShell:
+PowerShell 설정 예시:
 
 ```powershell
-$env:PEST_API_KEY = "발급받은_농촌진흥청_API_키"
-```
-
-AI 서버 또는 Redis 주소를 변경해야 할 경우 실행 옵션으로 덮어쓸 수 있습니다.
-
-```powershell
-.\gradlew.bat bootRun --args="--ai.api.url=http://test.com/predictionAPI --spring.data.redis.host=localhost"
-```
-
-## 실행
-
-```powershell
-# 1. Redis 실행
-redis-server
-
-# 2. 환경 변수 설정
 $env:PEST_API_KEY = "발급받은_API_키"
+$env:MYSQL_PASSWORD = "MySQL_비밀번호"
+$env:MYSQL_USERNAME = "plant_app"
+$env:AI_API_URL = "http://localhost:5000"
+```
 
-# 3. Spring Boot 실행
+MySQL 사용자에게 데이터베이스 생성 및 스키마 변경 권한이 있어야 합니다. 애플리케이션 시작 시 Flyway가 `src/main/resources/db/migration`의 마이그레이션을 실행하며, JPA는 결과 스키마를 검증합니다.
+
+## 실행 방법
+
+MySQL, Redis, AI 서버를 먼저 실행한 뒤 아래 명령을 사용합니다.
+
+### Windows
+
+```powershell
 .\gradlew.bat bootRun
 ```
 
-기본 포트는 `8080`입니다.
+### macOS / Linux
 
-```text
-http://localhost:8080
+```bash
+./gradlew bootRun
 ```
+
+서버는 기본적으로 `http://localhost:8080`에서 실행됩니다.
 
 ## API
 
-### 1. 병해충 검색
+### API 요약
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| `GET` | `/pest` | 병해충 검색 |
+| `GET` | `/pest/{sickKey}` | 병해충 상세 조회 |
+| `POST` | `/predict` | 이미지 기반 병해 예측 |
+
+### 병해충 검색
 
 ```http
 GET /pest?cropName={cropName}&sickNameKor={sickNameKor}&page={page}
 ```
 
-`cropName`, `sickNameKor` 중 하나 이상은 필수이며 `page`의 기본값은 `1`입니다.
+| 파라미터 | 필수 | 기본값 | 설명 |
+| --- | :---: | --- | --- |
+| `cropName` | 조건부 | - | 작물명. `sickNameKor`가 없으면 필수 |
+| `sickNameKor` | 조건부 | - | 병명. `cropName`이 없으면 필수 |
+| `page` | X | `1` | 1 이상의 페이지 번호 |
 
-```bash
+```powershell
 curl.exe "http://localhost:8080/pest?cropName=사과&page=1"
 ```
 
@@ -129,39 +146,43 @@ curl.exe "http://localhost:8080/pest?cropName=사과&page=1"
   "items": [
     {
       "cropName": "사과",
-      "thumbImg": "https://...",
+      "thumbImg": "https://example.com/image.jpg",
       "sickNameKor": "갈색무늬병",
-      "sickKey": "..."
+      "sickKey": "SICK_KEY"
     }
   ]
 }
 ```
 
-### 2. 병해충 상세 조회
+### 병해충 상세 조회
 
 ```http
 GET /pest/{sickKey}
 ```
 
-```bash
-curl.exe "http://localhost:8080/pest/{sickKey}"
+```powershell
+curl.exe "http://localhost:8080/pest/SICK_KEY"
 ```
 
-응답에는 `infectionRoute`, `developmentCondition`, `symptoms`, `preventionMethod`, 생물적·화학적 방제 방법과 `imageList`가 포함됩니다.
+응답에는 다음 정보가 포함됩니다.
 
-### 3. AI 이미지 예측
+- 작물명과 병명의 한글·한자·영문 표기
+- 감염 경로와 발생 조건
+- 증상 및 예방 방법
+- 생물적·화학적 방제 방법
+- 관련 이미지 목록
+
+### AI 이미지 예측
 
 ```http
 POST /predict
 Content-Type: multipart/form-data
 ```
 
-요청 필드:
-
 | 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `cropName` | String | O | 아래 지원 작물 중 하나 |
-| `image` | File | O | 이미지 파일, 최대 20MB |
+| --- | --- | :---: | --- |
+| `cropName` | String | O | 지원 작물의 영문 식별자 |
+| `image` | File | O | `image/*` 형식의 이미지, 최대 20MB |
 
 지원 작물:
 
@@ -174,18 +195,12 @@ Content-Type: multipart/form-data
 | `strawberry` | 딸기 |
 
 ```powershell
-curl.exe -X POST "http://localhost:8080/predict" -F "cropName=apple" -F "image=@C:\images\apple-leaf.jpg"
+curl.exe -X POST "http://localhost:8080/predict" `
+  -F "cropName=apple" `
+  -F "image=@C:\images\apple-leaf.jpg"
 ```
 
-#### 예측 결과 상태
-
-| `status` | 의미 | `pestInfo` |
-| --- | --- | --- |
-| `SUCCESS` | 예측 병명과 연결된 상세 정보를 찾았습니다. | 상세 객체 포함 |
-| `UNDETERMINED` | 이미지로 병해를 판별하기 어렵습니다. | `null` |
-| `INFO_NOT_FOUND` | 병명은 예측했지만 연결할 상세 정보가 없습니다. | `null` |
-
-`SUCCESS` 응답 예시:
+응답 예시:
 
 ```json
 {
@@ -204,62 +219,95 @@ curl.exe -X POST "http://localhost:8080/predict" -F "cropName=apple" -F "image=@
 }
 ```
 
-`INFO_NOT_FOUND` 응답 예시:
+#### 예측 상태
+
+| `status` | 의미 | `pestInfo` |
+| --- | --- | --- |
+| `SUCCESS` | 예측 결과와 일치하는 병해충 상세 정보를 찾았습니다. | 상세 객체 |
+| `UNDETERMINED` | AI가 이미지를 판별하기 어렵다고 응답했습니다. | `null` |
+| `INFO_NOT_FOUND` | 질병은 예측했지만 연결할 상세 정보가 없습니다. | `null` |
+
+## 외부 AI 서버 규격
+
+백엔드는 `${AI_API_URL}/predict`로 다음 요청을 전달합니다.
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `crop_name` | String | 영문 작물 식별자 |
+| `image` | File | 업로드 이미지 |
+
+AI 서버 응답 형식:
 
 ```json
 {
-  "status": "INFO_NOT_FOUND",
-  "cropName": "apple",
-  "sickNameKor": "예측된 병명",
-  "confidence": 95.5,
-  "message": "예측 결과와 맞는 병해충 상세 정보를 찾지 못했습니다.",
-  "pestInfo": null
+  "crop_name": "apple",
+  "sick_name_kor": "갈색무늬병",
+  "confidence": 99.0
 }
 ```
 
-## 캐시 정책
+판단하기 어려운 이미지라면 `sick_name_kor`에 `판단보류`를 반환합니다. AI 서버 요청 제한 시간은 15초입니다.
 
-| 캐시 이름 | 대상 | 키 | TTL |
+## 데이터 저장 및 캐시
+
+| 저장소 | 대상 | 식별 기준 | 정책 |
 | --- | --- | --- | --- |
-| `pestSearch` | 병해충 검색 결과 | `cropName:sickNameKor:page` | 30분 |
-| `pestInfo` | 병해충 상세 정보 | `sickKey` | 1시간 |
+| MySQL `ai_results` | AI 예측 결과 | 이미지 SHA-256 해시 + 요청 작물 | 영구 저장 및 중복 예측 방지 |
+| Redis `pestSearch` | 병해충 검색 결과 | `cropName:sickNameKor:page` | 30분 |
+| Redis `pestInfo` | 병해충 상세 정보 | `sickKey` | 1시간 |
+
+병해충 외부 API 요청 제한 시간은 5초입니다.
 
 ## 오류 응답
 
-모든 예외는 다음 형식으로 반환합니다.
+모든 예외 응답은 동일한 구조를 사용합니다.
 
 ```json
 {
   "status": 400,
   "code": "BAD_REQUEST",
-  "message": "작물명 또는 병명을 입력해야 합니다.",
-  "timestamp": "2026-06-23 12:00:00"
+  "message": "작물명 또는 병명 중 하나는 입력해야 합니다.",
+  "timestamp": "2026-06-29 12:00:00"
 }
 ```
 
 | HTTP 상태 | 코드 | 발생 상황 |
 | --- | --- | --- |
-| `400` | `BAD_REQUEST` | 잘못된 입력, 지원하지 않는 작물, 페이지 번호 오류 |
-| `413` | `FILE_TOO_LARGE` | 20MB 초과 파일 업로드 |
+| `400` | `BAD_REQUEST` | 잘못된 입력, 지원하지 않는 작물, 잘못된 파일 형식 |
+| `413` | `FILE_TOO_LARGE` | 20MB를 초과한 파일 업로드 |
 | `502` | `AI_SERVER_ERROR` | AI 서버 연결 또는 응답 처리 실패 |
-| `502` | `PEST_API_ERROR` | 병해충 외부 API 호출 실패 |
-| `504` | `AI_TIMEOUT` | AI 서버 응답 시간 초과 (15초) |
-| `504` | `PEST_API_TIMEOUT` | 병해충 외부 API 응답 시간 초과 |
+| `502` | `PEST_API_ERROR` | 병해충 API 연결 또는 응답 처리 실패 |
+| `502` | `EXTERNAL_API_ERROR` | 처리되지 않은 외부 API 호출 오류 |
+| `504` | `AI_TIMEOUT` | AI 서버 응답 시간 초과 |
+| `504` | `PEST_API_TIMEOUT` | 병해충 API 응답 시간 초과 |
+| `504` | `EXTERNAL_API_TIMEOUT` | 처리되지 않은 외부 API 타임아웃 |
 | `500` | `INTERNAL_SERVER_ERROR` | 처리되지 않은 서버 오류 |
 
 ## 프로젝트 구조
 
 ```text
-src/main/java/com/jihyoung/plant_disease_detection_web_spring
-├── global
-│   ├── dto                 # 공통 오류 응답
-│   └── exception           # 예외 타입 및 전역 예외 처리
-└── pest
-    ├── cache               # Redis 캐시 설정
-    ├── client              # AI 서버·병해충 외부 API 클라이언트
-    ├── controller          # REST 엔드포인트
-    ├── dto                 # 검색·상세·AI 응답 DTO
-    └── service             # 검색, 상세 조회, AI 결과 연결 로직
+src/main
+├── java/com/jihyoung/plant_disease_detection_web_spring
+│   ├── ai
+│   │   ├── client          # AI 서버 통신
+│   │   ├── controller      # 이미지 예측 API
+│   │   ├── dto             # AI 요청·응답 모델
+│   │   ├── entity          # AI 예측 결과 엔티티
+│   │   ├── repository      # 예측 결과 조회·저장
+│   │   └── service         # 검증, 예측, 결과 재사용 및 상세 정보 연결
+│   ├── pest
+│   │   ├── cache           # Redis 캐시 설정
+│   │   ├── client          # 농촌진흥청 API 통신
+│   │   ├── controller      # 병해충 검색·상세 API
+│   │   ├── dto             # 검색·상세 응답 모델
+│   │   └── service         # 검색, 페이징 및 상세 조회
+│   ├── global
+│   │   ├── dto             # 공통 오류 응답
+│   │   └── exception       # 외부 API 예외 및 전역 예외 처리
+│   └── user                # 사용자 엔티티와 저장소
+└── resources
+    ├── application.properties
+    └── db/migration        # Flyway 마이그레이션
 ```
 
 ## 테스트
