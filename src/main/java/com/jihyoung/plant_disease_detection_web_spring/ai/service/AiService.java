@@ -5,9 +5,12 @@ import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictApiRespon
 import com.jihyoung.plant_disease_detection_web_spring.ai.dto.AiPredictResultResponse;
 import com.jihyoung.plant_disease_detection_web_spring.ai.dto.PredictionStatus;
 import com.jihyoung.plant_disease_detection_web_spring.ai.entity.AiResult;
+import com.jihyoung.plant_disease_detection_web_spring.ai.entity.AiResultCache;
+import com.jihyoung.plant_disease_detection_web_spring.ai.repository.AiResultCacheRepository;
 import com.jihyoung.plant_disease_detection_web_spring.ai.repository.AiResultRepository;
 import com.jihyoung.plant_disease_detection_web_spring.global.exception.AiServerException;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.info.PestInfoResponse;
+import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchItem;
 import com.jihyoung.plant_disease_detection_web_spring.pest.dto.search.PestSearchResponse;
 import com.jihyoung.plant_disease_detection_web_spring.pest.service.PestService;
 import org.springframework.stereotype.Service;
@@ -43,15 +46,17 @@ public class AiService {
 
     private final AiApiClient aiApiClient;
     private final PestService pestService;
+    private final AiResultCacheRepository aiResultCacheRepository;
     private final AiResultRepository aiResultRepository;
 
     public AiService(
             AiApiClient aiApiClient,
             PestService pestService,
-            AiResultRepository aiResultRepository
+            AiResultCacheRepository aiResultCacheRepository, AiResultRepository aiResultRepository
     ) {
         this.aiApiClient = aiApiClient;
         this.pestService = pestService;
+        this.aiResultCacheRepository = aiResultCacheRepository;
         this.aiResultRepository = aiResultRepository;
     }
 
@@ -59,16 +64,20 @@ public class AiService {
         validate(requestedCropName, image);
 
         String imageHash = generateHash(image);
-        Optional<AiResult> cachedResult = aiResultRepository
+
+        //이미지 해시 값 중복 비교
+        Optional<AiResultCache> cachedResult = aiResultCacheRepository
                 .findByImageHashAndRequestedCropName(imageHash, requestedCropName);
 
         if (cachedResult.isPresent()) {
+            saveUploadResult(image.getOriginalFilename(), cachedResult.get());
             return buildCachedResponse(cachedResult.get());
         }
 
         return predictAndStore(requestedCropName, image, imageHash);
     }
 
+    // ai 예측
     private AiPredictResultResponse predictAndStore(
             String requestedCropName,
             MultipartFile image,
@@ -80,44 +89,64 @@ public class AiService {
         }
 
         if (UNDETERMINED_SICK_NAME.equals(response.sickNameKor())) {
-            AiResult result = saveAiResult(
+            AiResultCache cache = saveCache(
                     imageHash,
-                    image.getOriginalFilename(),
                     requestedCropName,
                     response,
                     PredictionStatus.UNDETERMINED,
                     null
             );
-            return toResponse(result, null, "판단이 어려운 이미지입니다. 다른 사진을 올려 주세요.");
+
+            saveUploadResult(image.getOriginalFilename(), cache);
+
+            return toResponse(cache, null, "판단이 어려운 이미지입니다. 다른 사진을 올려 주세요.");
         }
 
         Optional<String> sickKey = getSickKey(response.cropName(), response.sickNameKor());
         if (sickKey.isEmpty()) {
-            AiResult result = saveAiResult(
+            AiResultCache cache = saveCache(
                     imageHash,
-                    image.getOriginalFilename(),
                     requestedCropName,
                     response,
                     PredictionStatus.INFO_NOT_FOUND,
                     null
             );
-            return toResponse(result, null, "예측 결과에 맞는 병해충 상세 정보를 찾지 못했습니다.");
+
+            saveUploadResult(image.getOriginalFilename(), cache);
+
+            return toResponse(cache, null, "예측 결과에 맞는 병해충 상세 정보를 찾지 못했습니다.");
         }
 
-        AiResult result = saveAiResult(
+        AiResultCache cache = saveCache(
                 imageHash,
-                image.getOriginalFilename(),
                 requestedCropName,
                 response,
                 PredictionStatus.SUCCESS,
                 sickKey.get()
         );
 
+        saveUploadResult(image.getOriginalFilename(), cache);
+
         PestInfoResponse pestInfo = pestService.info(sickKey.get());
-        return toResponse(result, pestInfo, "예측에 성공했습니다.");
+        return toResponse(cache, pestInfo, "예측에 성공했습니다.");
     }
 
-    private AiPredictResultResponse buildCachedResponse(AiResult result) {
+    // ai_results 데이터 생성
+    private AiResult saveUploadResult(
+            String originalFileName,
+            AiResultCache cache
+    ) {
+        AiResult result = new AiResult(
+                null,
+                originalFileName,
+                cache
+        );
+
+        return aiResultRepository.save(result);
+    }
+
+    // 캐시 값 응답
+    private AiPredictResultResponse buildCachedResponse(AiResultCache result) {
         if (result.getStatus() != PredictionStatus.SUCCESS || !hasText(result.getSickKey())) {
             return toResponse(result, null, messageFor(result.getStatus()));
         }
@@ -126,18 +155,16 @@ public class AiService {
         return toResponse(result, pestInfo, "저장된 예측 결과를 사용했습니다.");
     }
 
-    private AiResult saveAiResult(
+    // 캐시값 생성
+    private AiResultCache saveCache(
             String imageHash,
-            String originalFileName,
             String requestedCropName,
             AiPredictApiResponse response,
             PredictionStatus status,
             String sickKey
     ) {
-        AiResult result = new AiResult(
-                null,
+        AiResultCache cache = new AiResultCache(
                 imageHash,
-                originalFileName,
                 requestedCropName,
                 response.cropName(),
                 response.sickNameKor(),
@@ -145,19 +172,22 @@ public class AiService {
                 response.confidence(),
                 status
         );
-        return aiResultRepository.save(result);
+
+
+        return aiResultCacheRepository.save(cache);
     }
 
+    // 응답구조
     private AiPredictResultResponse toResponse(
-            AiResult result,
+            AiResultCache cache,
             PestInfoResponse pestInfo,
             String message
     ) {
         return new AiPredictResultResponse(
-                result.getStatus(),
-                result.getCropName(),
-                result.getSickNameKor(),
-                result.getConfidence(),
+                cache.getStatus(),
+                cache.getCropName(),
+                cache.getSickNameKor(),
+                cache.getConfidence(),
                 message,
                 pestInfo
         );
@@ -211,7 +241,7 @@ public class AiService {
                 .filter(Objects::nonNull)
                 .filter(item -> sameText(pestApiCropName, item.cropName()))
                 .filter(item -> sameText(normalizedSickName, item.sickNameKor()))
-                .map(item -> item.sickKey())
+                .map(PestSearchItem::sickKey)
                 .filter(AiService::hasText)
                 .findFirst();
     }
