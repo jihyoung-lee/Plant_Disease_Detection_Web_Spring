@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
         name = "ai_results",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_ai_results_image_hash_crop",
-                columnNames = {"image_hash", "sickNameKor"}
+                columnNames = {"image_hash", "sick_name_kor"}
         )
 )
 @Getter
